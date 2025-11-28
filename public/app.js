@@ -1,13 +1,31 @@
-const STORAGE_KEY = 'anime_watchlist_v1';
 let currentFilter = 'all';
 
 function el(tag, cls, txt){ const e = document.createElement(tag); if(cls) e.className = cls; if(txt!==undefined) e.textContent = txt; return e; }
 
-function readList(){
-  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch(e){ return []; }
+async function readList(){
+  try {
+    const response = await fetch('/api/watchlist');
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch(e) {
+    console.error('Error loading watchlist:', e);
+    return [];
+  }
 }
 
-function writeList(list){ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+async function writeList(list){
+  try {
+    await fetch('/api/watchlist', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(list)
+    });
+  } catch(e) {
+    console.error('Error saving watchlist:', e);
+  }
+}
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
@@ -87,13 +105,13 @@ function renderItem(item){
   const epControls = el('div', 'ep-controls');
   
   const decBtn = el('button', 'ep-btn', '−');
-  decBtn.addEventListener('click', (e) => {
+  decBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    const list = readList();
+    const list = await readList();
     const idx = list.findIndex(i => i.id === item.id);
     if (idx !== -1 && (list[idx].currentEpisode || 0) > 0) {
       list[idx].currentEpisode = (list[idx].currentEpisode || 0) - 1;
-      writeList(list);
+      await writeList(list);
       load();
     }
   });
@@ -101,16 +119,16 @@ function renderItem(item){
   const epVal = el('span', 'ep-val', item.currentEpisode || '0');
   
   const incBtn = el('button', 'ep-btn', '+');
-  incBtn.addEventListener('click', (e) => {
+  incBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    const list = readList();
+    const list = await readList();
     const idx = list.findIndex(i => i.id === item.id);
     if (idx !== -1) {
       list[idx].currentEpisode = (list[idx].currentEpisode || 0) + 1;
       if (list[idx].episodes && list[idx].episodes > 0 && list[idx].currentEpisode > list[idx].episodes) {
         list[idx].currentEpisode = list[idx].episodes;
       }
-      writeList(list);
+      await writeList(list);
       load();
     }
   });
@@ -130,14 +148,14 @@ function renderItem(item){
     const pencilIcon = el('span', 'pencil-icon', '✎');
     completeBtn.appendChild(document.createTextNode('Mark as Completed'));
     completeBtn.appendChild(pencilIcon);
-    completeBtn.addEventListener('click', (e) => {
+    completeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
-      const list = readList();
+      const list = await readList();
       const idx = list.findIndex(i => i.id === item.id);
       if (idx !== -1) {
         list[idx].status = 'completed';
         list[idx].currentEpisode = list[idx].episodes || 0;
-        writeList(list);
+        await writeList(list);
         load();
       }
     });
@@ -146,10 +164,10 @@ function renderItem(item){
   
   const delBtn = el('button', 'action-btn delete', '🗑');
   delBtn.title = 'Delete';
-  delBtn.addEventListener('click', () => {
+  delBtn.addEventListener('click', async () => {
     if (!confirm('Delete this entry?')) return;
-    const list = readList().filter(i => i.id !== item.id);
-    writeList(list);
+    const list = (await readList()).filter(i => i.id !== item.id);
+    await writeList(list);
     load();
   });
   footer.appendChild(delBtn);
@@ -159,10 +177,10 @@ function renderItem(item){
   return card;
 }
 
-function load(){
+async function load(){
   const listEl = document.getElementById('list');
   listEl.innerHTML = '';
-  const items = readList();
+  const items = await readList();
   
   let filtered = items;
   if (currentFilter === 'watching') filtered = items.filter(i => i.status === 'watching');
@@ -234,22 +252,22 @@ addForm.addEventListener('submit', async (e) => {
       try { image = await readFileAsDataURL(imageFileInput); } catch(e) { console.warn('image read failed', e); }
   }
 
-  const list = readList();
+    const list = await readList();
 
-  // If form has data-edit-id, update existing item instead of creating new
-  const editId = addForm.dataset.editId;
-  if (editId) {
-    const idx = list.findIndex(i => i.id === editId);
-    if (idx !== -1) {
-      list[idx] = Object.assign({}, list[idx], {
-        title,
-        episodes,
-        currentEpisode,
-        status,
-        image: image || list[idx].image,
-        genres: genresStr ? genresStr.split(',').map(g => g.trim()) : (list[idx].genres || [])
-      });
-      writeList(list);
+    // If form has data-edit-id, update existing item instead of creating new
+    const editId = addForm.dataset.editId;
+    if (editId) {
+      const idx = list.findIndex(i => i.id === editId);
+      if (idx !== -1) {
+        list[idx] = Object.assign({}, list[idx], {
+          title,
+          episodes,
+          currentEpisode,
+          status,
+          image: image || list[idx].image,
+          genres: genresStr ? genresStr.split(',').map(g => g.trim()) : (list[idx].genres || [])
+        });
+      await writeList(list);
       delete addForm.dataset.editId;
       addForm.reset();
         resetImagePreview();
@@ -263,7 +281,7 @@ addForm.addEventListener('submit', async (e) => {
   const item = { id: uid(), title, episodes, currentEpisode, status, genres: [], image };
   item.genres = genresStr ? genresStr.split(',').map(g => g.trim()) : [];
   list.push(item);
-  writeList(list);
+  await writeList(list);
   addForm.reset();
     resetImagePreview();
   if (submitBtn) submitBtn.textContent = 'Add to List';
@@ -320,8 +338,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-function editItem(item) {
-  const list = readList();
+async function editItem(item) {
+  const list = await readList();
   const idx = list.findIndex(i => i.id === item.id);
   if (idx === -1) return;
   
