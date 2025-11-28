@@ -5,6 +5,9 @@ function el(tag, cls, txt){ const e = document.createElement(tag); if(cls) e.cla
 async function readList(){
   try {
     const response = await fetch('/api/watchlist');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     const data = await response.json();
     return Array.isArray(data) ? data : [];
   } catch(e) {
@@ -15,15 +18,22 @@ async function readList(){
 
 async function writeList(list){
   try {
-    await fetch('/api/watchlist', {
+    const response = await fetch('/api/watchlist', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(list)
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    return result;
   } catch(e) {
     console.error('Error saving watchlist:', e);
+    alert('Failed to save anime. Please try again.');
+    throw e;
   }
 }
 
@@ -107,12 +117,16 @@ function renderItem(item){
   const decBtn = el('button', 'ep-btn', '−');
   decBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    const list = await readList();
-    const idx = list.findIndex(i => i.id === item.id);
-    if (idx !== -1 && (list[idx].currentEpisode || 0) > 0) {
-      list[idx].currentEpisode = (list[idx].currentEpisode || 0) - 1;
-      await writeList(list);
-      load();
+    try {
+      const list = await readList();
+      const idx = list.findIndex(i => i.id === item.id);
+      if (idx !== -1 && (list[idx].currentEpisode || 0) > 0) {
+        list[idx].currentEpisode = (list[idx].currentEpisode || 0) - 1;
+        await writeList(list);
+        await load();
+      }
+    } catch (error) {
+      console.error('Error updating episode:', error);
     }
   });
   
@@ -121,15 +135,19 @@ function renderItem(item){
   const incBtn = el('button', 'ep-btn', '+');
   incBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    const list = await readList();
-    const idx = list.findIndex(i => i.id === item.id);
-    if (idx !== -1) {
-      list[idx].currentEpisode = (list[idx].currentEpisode || 0) + 1;
-      if (list[idx].episodes && list[idx].episodes > 0 && list[idx].currentEpisode > list[idx].episodes) {
-        list[idx].currentEpisode = list[idx].episodes;
+    try {
+      const list = await readList();
+      const idx = list.findIndex(i => i.id === item.id);
+      if (idx !== -1) {
+        list[idx].currentEpisode = (list[idx].currentEpisode || 0) + 1;
+        if (list[idx].episodes && list[idx].episodes > 0 && list[idx].currentEpisode > list[idx].episodes) {
+          list[idx].currentEpisode = list[idx].episodes;
+        }
+        await writeList(list);
+        await load();
       }
-      await writeList(list);
-      load();
+    } catch (error) {
+      console.error('Error updating episode:', error);
     }
   });
   
@@ -150,13 +168,17 @@ function renderItem(item){
     completeBtn.appendChild(pencilIcon);
     completeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
-      const list = await readList();
-      const idx = list.findIndex(i => i.id === item.id);
-      if (idx !== -1) {
-        list[idx].status = 'completed';
-        list[idx].currentEpisode = list[idx].episodes || 0;
-        await writeList(list);
-        load();
+      try {
+        const list = await readList();
+        const idx = list.findIndex(i => i.id === item.id);
+        if (idx !== -1) {
+          list[idx].status = 'completed';
+          list[idx].currentEpisode = list[idx].episodes || 0;
+          await writeList(list);
+          await load();
+        }
+      } catch (error) {
+        console.error('Error marking as completed:', error);
       }
     });
     footer.appendChild(completeBtn);
@@ -166,9 +188,13 @@ function renderItem(item){
   delBtn.title = 'Delete';
   delBtn.addEventListener('click', async () => {
     if (!confirm('Delete this entry?')) return;
-    const list = (await readList()).filter(i => i.id !== item.id);
-    await writeList(list);
-    load();
+    try {
+      const list = (await readList()).filter(i => i.id !== item.id);
+      await writeList(list);
+      await load();
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+    }
   });
   footer.appendChild(delBtn);
   
@@ -231,63 +257,76 @@ const addForm = document.getElementById('addForm');
 const submitBtn = addForm ? addForm.querySelector('button[type="submit"]') : null;
 
 if (addForm) {
-addForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const title = document.getElementById('title').value.trim();
-  if (!title) return alert('Title required');
-  const episodes = Number(document.getElementById('episodes').value) || 0;
-  let currentEpisode = Number(document.getElementById('currentEpisode').value) || 0;
-  if (episodes > 0) {
-    if (currentEpisode < 0) currentEpisode = 0;
-    if (currentEpisode > episodes) currentEpisode = episodes;
-  } else {
-    if (currentEpisode < 0) currentEpisode = 0;
-  }
-  const status = document.getElementById('status').value;
-  const genresStr = document.getElementById('genres') ? document.getElementById('genres').value.trim() : '';
-    const imageFileInput = document.getElementById('imageFile').files[0];
+  addForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const title = document.getElementById('title').value.trim();
+      if (!title) {
+        alert('Title required');
+        return;
+      }
+      
+      const episodes = Number(document.getElementById('episodes').value) || 0;
+      let currentEpisode = Number(document.getElementById('currentEpisode').value) || 0;
+      if (episodes > 0) {
+        if (currentEpisode < 0) currentEpisode = 0;
+        if (currentEpisode > episodes) currentEpisode = episodes;
+      } else {
+        if (currentEpisode < 0) currentEpisode = 0;
+      }
+      const status = document.getElementById('status').value;
+      const genresStr = document.getElementById('genres') ? document.getElementById('genres').value.trim() : '';
+      const imageFileInput = document.getElementById('imageFile').files[0];
 
-  let image = null;
-    if (imageFileInput) {
-      try { image = await readFileAsDataURL(imageFileInput); } catch(e) { console.warn('image read failed', e); }
-  }
+      let image = null;
+      if (imageFileInput) {
+        try { 
+          image = await readFileAsDataURL(imageFileInput); 
+        } catch(e) { 
+          console.warn('image read failed', e); 
+        }
+      }
 
-    const list = await readList();
+      const list = await readList();
 
-    // If form has data-edit-id, update existing item instead of creating new
-    const editId = addForm.dataset.editId;
-    if (editId) {
-      const idx = list.findIndex(i => i.id === editId);
-      if (idx !== -1) {
-        list[idx] = Object.assign({}, list[idx], {
-          title,
-          episodes,
-          currentEpisode,
-          status,
-          image: image || list[idx].image,
-          genres: genresStr ? genresStr.split(',').map(g => g.trim()) : (list[idx].genres || [])
-        });
+      // If form has data-edit-id, update existing item instead of creating new
+      const editId = addForm.dataset.editId;
+      if (editId) {
+        const idx = list.findIndex(i => i.id === editId);
+        if (idx !== -1) {
+          list[idx] = Object.assign({}, list[idx], {
+            title,
+            episodes,
+            currentEpisode,
+            status,
+            image: image || list[idx].image,
+            genres: genresStr ? genresStr.split(',').map(g => g.trim()) : (list[idx].genres || [])
+          });
+          await writeList(list);
+          delete addForm.dataset.editId;
+          addForm.reset();
+          resetImagePreview();
+          if (submitBtn) submitBtn.textContent = 'Add to List';
+          modal.classList.add('modal-hidden');
+          await load();
+          return;
+        }
+      }
+
+      const item = { id: uid(), title, episodes, currentEpisode, status, genres: [], image };
+      item.genres = genresStr ? genresStr.split(',').map(g => g.trim()) : [];
+      list.push(item);
       await writeList(list);
-      delete addForm.dataset.editId;
       addForm.reset();
-        resetImagePreview();
+      resetImagePreview();
       if (submitBtn) submitBtn.textContent = 'Add to List';
       modal.classList.add('modal-hidden');
-      load();
-      return;
+      await load();
+    } catch (error) {
+      console.error('Form submission error:', error);
+      alert('Failed to save anime. Please check the console for details.');
     }
-  }
-
-  const item = { id: uid(), title, episodes, currentEpisode, status, genres: [], image };
-  item.genres = genresStr ? genresStr.split(',').map(g => g.trim()) : [];
-  list.push(item);
-  await writeList(list);
-  addForm.reset();
-    resetImagePreview();
-  if (submitBtn) submitBtn.textContent = 'Add to List';
-  modal.classList.add('modal-hidden');
-  load();
-});
+  });
 }
 
 const modal = document.getElementById('formModal');
