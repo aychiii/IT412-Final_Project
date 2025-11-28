@@ -12,8 +12,8 @@ function writeList(list){ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 function getStatusColor(status){
-  const colors = { 'plan-to-watch': '#999', 'watching': '#4CAF50', 'completed': '#2196F3', 'dropped': '#f44336' };
-  return colors[status] || '#999';
+  const colors = { 'plan-to-watch': '#38506A', 'watching': '#446983', 'completed': '#071018', 'dropped': '#38506A' };
+  return colors[status] || '#38506A';
 }
 
 function getStatusLabel(status){
@@ -181,8 +181,38 @@ function readFileAsDataURL(file){
   });
 }
 
+// Image preview handling - define early so it's available everywhere
+const imageFile = document.getElementById('imageFile');
+const imagePreview = document.getElementById('imagePreview');
+
+function resetImagePreview() {
+  if (imagePreview) {
+    imagePreview.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg><p>Click to add image</p>`;
+  }
+  if (imageFile) imageFile.value = '';
+}
+
+if (imagePreview && imageFile) {
+  imagePreview.addEventListener('click', () => {
+    imageFile.click();
+  });
+
+  imageFile.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        imagePreview.innerHTML = `<img src="${event.target.result}" alt="preview" />`;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
 const addForm = document.getElementById('addForm');
-const submitBtn = addForm.querySelector('button[type="submit"]');
+const submitBtn = addForm ? addForm.querySelector('button[type="submit"]') : null;
+
+if (addForm) {
 addForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const title = document.getElementById('title').value.trim();
@@ -197,11 +227,11 @@ addForm.addEventListener('submit', async (e) => {
   }
   const status = document.getElementById('status').value;
   const genresStr = document.getElementById('genres') ? document.getElementById('genres').value.trim() : '';
-  const imageFile = document.getElementById('imageFile').files[0];
+    const imageFileInput = document.getElementById('imageFile').files[0];
 
   let image = null;
-  if (imageFile) {
-    try { image = await readFileAsDataURL(imageFile); } catch(e) { console.warn('image read failed', e); }
+    if (imageFileInput) {
+      try { image = await readFileAsDataURL(imageFileInput); } catch(e) { console.warn('image read failed', e); }
   }
 
   const list = readList();
@@ -222,6 +252,7 @@ addForm.addEventListener('submit', async (e) => {
       writeList(list);
       delete addForm.dataset.editId;
       addForm.reset();
+        resetImagePreview();
       if (submitBtn) submitBtn.textContent = 'Add to List';
       modal.classList.add('modal-hidden');
       load();
@@ -234,33 +265,51 @@ addForm.addEventListener('submit', async (e) => {
   list.push(item);
   writeList(list);
   addForm.reset();
+    resetImagePreview();
   if (submitBtn) submitBtn.textContent = 'Add to List';
   modal.classList.add('modal-hidden');
   load();
 });
+}
 
 const modal = document.getElementById('formModal');
 const closeBtn = document.querySelector('.close');
+
+function closeModal() {
+  if (!modal || !addForm) return;
+  modal.classList.add('modal-hidden');
+  addForm.reset();
+  delete addForm.dataset.editId;
+  resetImagePreview();
+  if (submitBtn) submitBtn.textContent = 'Add to List';
+  const titleEl = modal.querySelector('h2');
+  if (titleEl) titleEl.textContent = 'Add anime';
+}
+
+if (document.getElementById('addBtn')) {
 document.getElementById('addBtn').addEventListener('click', () => {
   // ensure add form is in create mode
   delete addForm.dataset.editId;
   addForm.reset();
-  // clear any previous preview
-  try { resetImagePreview(); } catch(e) {}
+    resetImagePreview();
   if (submitBtn) submitBtn.textContent = 'Add to List';
   const titleEl = modal.querySelector('h2');
   if (titleEl) titleEl.textContent = 'Add anime';
   modal.classList.remove('modal-hidden');
 });
+}
+
+if (closeBtn) {
 closeBtn.addEventListener('click', () => {
-  modal.classList.add('modal-hidden');
-  addForm.reset();
-  delete addForm.dataset.editId;
-  if (submitBtn) submitBtn.textContent = 'Add to List';
-  const titleEl = modal.querySelector('h2');
-  if (titleEl) titleEl.textContent = 'Add anime';
+    closeModal();
+  });
+}
+
+window.addEventListener('click', (e) => { 
+  if (e.target === modal) { 
+    closeModal();
+  } 
 });
-window.addEventListener('click', (e) => { if (e.target === modal) { modal.classList.add('modal-hidden'); addForm.reset(); delete addForm.dataset.editId; if (submitBtn) submitBtn.textContent = 'Add to List'; const titleEl = modal.querySelector('h2'); if (titleEl) titleEl.textContent = 'Add anime'; } });
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -285,10 +334,9 @@ function editItem(item) {
   document.getElementById('imageFile').value = '';
   // show existing image in preview if present
   if (item.image) {
-    const imagePreview = document.getElementById('imagePreview');
     if (imagePreview) imagePreview.innerHTML = `<img src="${item.image}" alt="preview" />`;
   } else {
-    try { resetImagePreview(); } catch(e) {}
+    resetImagePreview();
   }
   // mark the form as editing this item id; the submit handler will update the item
   const form = document.getElementById('addForm');
@@ -301,38 +349,3 @@ function editItem(item) {
 
 load();
 
-// Image preview handling
-const imageFile = document.getElementById('imageFile');
-const imagePreview = document.getElementById('imagePreview');
-
-imagePreview.addEventListener('click', () => {
-  imageFile.click();
-});
-
-imageFile.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      imagePreview.innerHTML = `<img src="${event.target.result}" alt="preview" />`;
-    };
-    reader.readAsDataURL(file);
-  }
-});
-
-// Reset image preview when opening/closing modal
-// Reset image preview when opening/closing modal
-// (re-use existing `modal` and `closeBtn` declared earlier)
-
-function resetImagePreview() {
-  imagePreview.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg><p>Click to add image</p>`;
-  imageFile.value = '';
-}
-
-// Enhance close button listener (also reset preview on close)
-if (typeof closeBtn !== 'undefined' && closeBtn) {
-  try { const originalCloseClick = closeBtn.onclick; } catch(e) {}
-  closeBtn.addEventListener('click', () => {
-    resetImagePreview();
-  });
-}
