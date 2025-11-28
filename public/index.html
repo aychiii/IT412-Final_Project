@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Anime Watchlist Tracker</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Anime Watchlist</h1>
+        <button id="addBtn" class="btn-primary">+ Add anime</button>
+      </div>
+
+      <div id="formModal" class="modal modal-hidden">
+        <div class="modal-content large">
+          <span class="close">&times;</span>
+          <h2>Add anime</h2>
+          <p class="modal-subtitle">Track what you're watching and never lose your place.</p>
+          
+          <form id="addForm">
+            <div class="form-row-3col">
+              <div class="form-group">
+                <label>Anime title</label>
+                <input id="title" placeholder="e.g. Fullmetal Alchemist: Brotherhood" required />
+              </div>
+              <div class="form-group">
+                <label>Total episodes <span class="optional">(optional)</span></label>
+                <div class="input-with-unit">
+                  <input id="episodes" type="number" min="0" placeholder="e.g. 24" />
+                  <span class="unit">eps</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Current episode <span class="optional">(optional)</span></label>
+                <div class="input-with-unit">
+                  <input id="currentEpisode" type="number" min="0" placeholder="e.g. 5" />
+                  <span class="unit">ep</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Genres <span class="optional">(optional)</span></label>
+              <input id="genres" placeholder="e.g. Adventure, Fantasy" />
+            </div>
+
+            <div class="form-group">
+              <label>Image <span class="optional">(optional)</span></label>
+              <div class="image-upload-box">
+                <input id="imageFile" type="file" accept="image/*" style="display:none" />
+                <div id="imagePreview" class="image-preview">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  <p>Click to add image</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Status</label>
+              <select id="status">
+                <option value="plan-to-watch">Planning</option>
+                <option value="watching">Watching</option>
+                <option value="completed">Completed</option>
+                <option value="dropped">Dropped</option>
+              </select>
+            </div>
+
+            <p class="form-help-text">You can update episodes and status anytime from the list below.</p>
+
+            <button type="submit" class="btn-add-to-list">Add to List</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-filter="all">All</button>
+        <button class="tab-btn" data-filter="watching">Watching</button>
+        <button class="tab-btn" data-filter="completed">Completed</button>
+      </div>
+
+      <div id="list" class="card-grid"></div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
